@@ -1,9 +1,8 @@
 from flask.ext.script import Manager
-from flask import Flask
+from flask import Flask, render_template
 from flask import request
 from flask import redirect
 from flask import abort
-
 
 """
 Flask 클래스 생성자에 필요한 인수는 "메인모듈의 이름" 혹은 "애플리케이션의 패키지 이름"
@@ -25,8 +24,8 @@ app.route 데코레이터를 사용한다.
 """
 @app.route('/')
 def index():
-    return '<p>Hello World!</p>'
-
+    #return '<p>Hello World!</p>'
+    return render_template('index.html')
 
 
 
@@ -36,7 +35,8 @@ def index():
 """
 @app.route('/user/<name>')
 def user(name):
-    return '<p>Hello %s</p>' % name 
+    # return '<p>Hello %s</p>' % name 
+    return render_template('user.html', name=name)
 
 
 """
