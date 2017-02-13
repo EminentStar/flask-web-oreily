@@ -8,16 +8,16 @@
        인증을 검증하는데 사용됨.
 """
 from datetime import datetime
-from flask.ext.script import Manager
+from flask_script import Manager
 from flask import Flask, render_template
 from flask import request
 from flask import redirect
 from flask import abort
-from flask.ext.bootstrap import Bootstrap
+from flask_bootstrap import Bootstrap
 from flask import url_for
-from flask.ext.moment import Moment
+from flask_moment import Moment
 
-from flask.ext.wtf import FlaskForm
+from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField 
 from wtforms.validators import Required
 
@@ -36,7 +36,14 @@ app = Flask(__name__)
 manager = Manager(app)
 bootstrap = Bootstrap(app)
 moment = Moment(app)
-app.config['SECKET_KEY'] = '87sh5#(6ui)(!lr#091+8iu2k^=az-6ac+sszj48issc!lu%=j' # 암호화 키 설정 방법
+app.config['SECRET_KEY'] = 'hard to guess' # 암호화 키 설정 방법
+
+
+# Form Class 정의
+class NameForm(FlaskForm):
+    name = StringField('What is your name?', validators=[Required()])
+    submit = SubmitField('Submit')
+
 
 
 """
@@ -187,10 +194,6 @@ def internal_server_error(e):
 
 
 
-# Form Class 정의
-class NameForm(FlaskForm):
-    name = StringField('What is your name?', validators=[Required()])
-    submit = SubmitField('Submit')
 
 
 
