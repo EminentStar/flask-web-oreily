@@ -1,6 +1,11 @@
 """
 
 * flask.ext.moment: 브라우저에서 시간과 날짜를 렌더링하도록 해주는 라이브러리
+* flask.ext.wtf: 크로스 사이트 리퀘스트 위조(CSRF) 공격으로부터 모든 폼을 보호
+  - CSRF 공격: 악의적 웹사이트에서 희생자가 로그인한 다른 웹사이트로 리퀘스트를 전송할 때 일어남
+    - CSRF 보호를 구현하기 위해 Flask-WTF는 암호화 키를 설정하기 위한 앱이 필요
+    -  Flask-WTF는 이 키를 사용하여 암호화된 토큰을 생성하고 이 토큰은 폼 데이터와 함께 리퀘스트
+       인증을 검증하는데 사용됨.
 """
 from datetime import datetime
 from flask.ext.script import Manager
@@ -11,6 +16,10 @@ from flask import abort
 from flask.ext.bootstrap import Bootstrap
 from flask import url_for
 from flask.ext.moment import Moment
+
+from flask.ext.wtf import FlaskForm
+from wtforms import StringField, SubmitField 
+from wtforms.validators import Required
 
 
 """
@@ -27,12 +36,16 @@ app = Flask(__name__)
 manager = Manager(app)
 bootstrap = Bootstrap(app)
 moment = Moment(app)
+app.config['SECKET_KEY'] = '87sh5#(6ui)(!lr#091+8iu2k^=az-6ac+sszj48issc!lu%=j' # 암호화 키 설정 방법
+
 
 """
 라우트: URL을 파이썬 함수에 매핑하는 기능
 app.route 데코레이터를 사용한다.
 """
-@app.route('/')
+#@app.route('/')
+# methods가 주어지지 않으면 뷰 함수는 GET 리퀘스트만 처리하도록 등록된다.
+@app.route('/', methods=['GET', 'POST'])
 def index():
     print("index: " + url_for('index', _external=True))
     print("user: " + url_for('user', name='junkyu', _external=True ))
@@ -53,7 +66,15 @@ def index():
 
     # return '<p>Hello World!</p>'
     # return render_template('index.html')
-    return render_template('index.html', current_time=datetime.utcnow())
+    # return render_template('index.html', current_time=datetime.utcnow())
+    name = None
+    form = NameForm()
+    # form이 submit될 때 True를 리턴하고 데이터는 모든 필드 검증자에 의해 받아들여지게 된다.
+    if form.validate_on_submit():         
+        name = form.name.data
+        form.name.data = ''
+    
+    return render_template('index.html', form=form, name=name)
 
 
 
@@ -163,6 +184,15 @@ def page_not_found(e):
 @app.errorhandler(500)
 def internal_server_error(e):
     return render_template('500.html'), 500
+
+
+
+# Form Class 정의
+class NameForm(FlaskForm):
+    name = StringField('What is your name?', validators=[Required()])
+    submit = SubmitField('Submit')
+
+
 
 
 
