@@ -6,6 +6,7 @@
     - CSRF 보호를 구현하기 위해 Flask-WTF는 암호화 키를 설정하기 위한 앱이 필요
     -  Flask-WTF는 이 키를 사용하여 암호화된 토큰을 생성하고 이 토큰은 폼 데이터와 함께 리퀘스트
        인증을 검증하는데 사용됨.
+* flash: 사용자에게 상태 업데이트를 전달하는 메시지를 구성할 수 있는 모듈
 """
 from datetime import datetime
 from flask_script import Manager
@@ -16,6 +17,9 @@ from flask import abort
 from flask_bootstrap import Bootstrap
 from flask import url_for
 from flask_moment import Moment
+from flask import session
+from flask import flash
+
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField 
@@ -77,11 +81,27 @@ def index():
     name = None
     form = NameForm()
     # form이 submit될 때 True를 리턴하고 데이터는 모든 필드 검증자에 의해 받아들여지게 된다.
-    if form.validate_on_submit():         
+    if form.validate_on_submit():
+        """
         name = form.name.data
         form.name.data = ''
-    
-    return render_template('index.html', form=form, name=name)
+        """
+        """
+        session['name'] = form.name.data
+        return redirect(url_for('index'))
+        """
+        old_name = session.get('name')
+        if old_name is not None and old_name != form.name.data:
+            flash('Looks like you have changed yourname!')
+        session['name'] = form.name.data
+        form.name.data = ''
+        return redirect(url_for('index'))
+    return render_template('index.html',
+        form = form, name = session.get('name'))
+
+
+    return render_template('index.html', form=form, name=session.get('name'))
+    # return render_template('index.html', form=form, name=name)
 
 
 
