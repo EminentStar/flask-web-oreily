@@ -21,6 +21,10 @@ from flask_moment import Moment
 from flask import session
 from flask import flash
 from flask.ext.sqlalchemy import SQLAlchemy
+from flask_wtf import FlaskForm
+from wtforms import StringField, SubmitField 
+from wtforms.validators import Required
+
 # 쉘 세션이 시작될 때마다 디비 인스턴스 및 모델을 임포트하는 반복을 피하기 위해 사용. 
 # 특정 오브젝트를 자동으로 임포트하기 위해 설정. make_context 콜백 함수를 이용하여 등록해야함.
 from flask.ext.script import Shell
@@ -28,10 +32,14 @@ from flask.ext.script import Shell
 # Flask- Migrate 설정
 from flask.ext.migrate import Migrate, MigrateCommand
 
-from flask_wtf import FlaskForm
-from wtforms import StringField, SubmitField 
-from wtforms.validators import Required
+# Flask-Mail 초기화
+from flask.ext.mail import Mail
 
+# 이메일 지원
+from flask.ext.mail import Message
+
+# 이메일 비동기 처리를 위한 Thread
+from threading import Thread
 
 """
 Flask 클래스 생성자에 필요한 인수는 "메인모듈의 이름" 혹은 "애플리케이션의 패키지 이름"
@@ -93,6 +101,42 @@ migrate = Migrate(app, db)
 manager.add_command('db', MigrateCommand)
 
 
+# 지메일을 위한 Flask-Mail 설정
+app.config['MAIL_SERVER'] = 'smtp.googlemail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+"""
+스크립트에 직접 계정정보를 작성하지 말 것. 오픈소스로 공개할 계획이라면 절대 작성X.
+계정 정보를 보호하기 위해 스크립트는 환경에서 민감한 정보를 임포트한다.
+이메일 서버 사용자 이름과 패스워드를 보관하는 2개의 환경 변수를정의해야만 함.
+배시(bash)를 사용하는 리눅스나 Mac OS X를 사용한다면 다음과 같이 변수들을 설정 가능
+$ export MAIL_USERNAME=<Gmail username>
+$ export MAIL_PASSWORD=<Gmail password>
+"""
+# os.environ.get(var)는 환경변수를 불러오는 함수
+app.config['MAIL_USERNAME'] = os.environ.get('MAIL_USERNAME') 
+app.config['MAIL_PASSWORD'] = os.environ.get('MAIL_PASSWORD')
+
+app.config['FLASKY_MAIL_SUBJECT_PREFIX'] = '[Flasky]'
+app.config['FLASKY_MAIL_SENDER'] = 'Flasky Admin <flasky@example.com>'
+
+app.config['FLASKY_ADMIN'] = os.environ.get('FLASKY_ADMIN')
+
+def send_async_email(app, msg):
+    with app.app_context():
+        mail.send(msg)
+
+def send_mail(to, subject, template, **kwargs):
+    msg = Message(app.config['FLASKY_MAIL_SUBJECT_PREFIX'] + subject,
+            sender=app.config['FLASKY_MAIL_SENDER'], recipients=[to])
+    msg.body = render_template(template + '.txt', **kwargs)
+    msg.html = render_template(template + '.html', **kwargs)
+    thr = Thread(target=send_async_email, args=[app, msg])
+    thr.start()
+    return thr
+
+# Flask-Mail 초기화
+mail = Mail(app)
 
 # Form Class 정의
 class NameForm(FlaskForm):
@@ -109,6 +153,9 @@ def index():
             user = User(username = form.name.data)
             db.session.add(user)
             session['known'] = False
+            # 새로운 이름이 폼과 함께 수신될때마다 관리자에게 이메일을 전송하도록 확장가능
+            if app.config['FLASKY_ADMIN']:
+                send_email(app.config['FLASKY_ADMIN'], 'New User', 'mail/new_user', user=user)
         else:
             session['known'] = True
         session['name'] = form.name.data
