@@ -21,7 +21,12 @@ from flask_moment import Moment
 from flask import session
 from flask import flash
 from flask.ext.sqlalchemy import SQLAlchemy
+# 쉘 세션이 시작될 때마다 디비 인스턴스 및 모델을 임포트하는 반복을 피하기 위해 사용. 
+# 특정 오브젝트를 자동으로 임포트하기 위해 설정. make_context 콜백 함수를 이용하여 등록해야함.
+from flask.ext.script import Shell
 
+# Flask- Migrate 설정
+from flask.ext.migrate import Migrate, MigrateCommand
 
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField 
@@ -45,6 +50,7 @@ basedir = os.path.abspath(os.path.dirname(__file__))
 app.config['SQLALCHEMY_DATABASE_URI'] =\
         'sqlite:///' + os.path.join(basedir, 'data.sqlite')
 app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
+app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 db = SQLAlchemy(app)
 
 """데이터베이스 모델 정의"""
@@ -64,6 +70,7 @@ class User(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True, index=True)
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id')) 
+    password = db.Column(db.String(20))
 
     def __repr__(self):
         return '<User %r>' % self.username
@@ -76,11 +83,40 @@ moment = Moment(app)
 app.config['SECRET_KEY'] = 'hard to guess' # 암호화 키 설정 방법
 
 
+def make_shell_context():
+    return dict(app=app, db=db, User=User, Role=Role)
+
+manager.add_command("shell", Shell(make_context=make_shell_context))
+
+# Flask- Migrate 설정
+migrate = Migrate(app, db)
+manager.add_command('db', MigrateCommand)
+
+
+
 # Form Class 정의
 class NameForm(FlaskForm):
     name = StringField('What is your name?', validators=[Required()])
     submit = SubmitField('Submit')
 
+
+@app.route('/', methods=['GET', 'POST'])
+def index():
+    form = NameForm()
+    if form.validate_on_submit():
+        user = User.query.filter_by(username=form.name.data).first()
+        if user is None:
+            user = User(username = form.name.data)
+            db.session.add(user)
+            session['known'] = False
+        else:
+            session['known'] = True
+        session['name'] = form.name.data
+        form.name.data = ''
+        return redirect(url_for('index'))
+    return render_template('index.html',
+        form = form, name = session.get('name'),
+        known = session.get('known', False))
 
 
 """
@@ -89,8 +125,8 @@ app.route 데코레이터를 사용한다.
 """
 #@app.route('/')
 # methods가 주어지지 않으면 뷰 함수는 GET 리퀘스트만 처리하도록 등록된다.
-@app.route('/', methods=['GET', 'POST'])
-def index():
+@app.route('/index_first', methods=['GET', 'POST'])
+def index_first():
     print("index: " + url_for('index', _external=True))
     print("user: " + url_for('user', name='junkyu', _external=True ))
     print("dict_view: " + url_for('dict_view', _external=True))
