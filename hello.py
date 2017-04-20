@@ -52,7 +52,9 @@ class Role(db.Model):
     __tablename__ = 'roles'
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(64), unique=True)
-    users = db.relationship('User', backref='role') 
+    # 관계 설정은 쿼리가 자동으로 실행되지 않도록 리퀘스트하기 위해 lazy='dynamic'으로
+    # users = db.relationship('User', backref='role') 
+    users = db.relationship('User', backref='role', lazy='dynamic') 
 
     def __repr__(self):
         return '<Role %r>' % self.name
