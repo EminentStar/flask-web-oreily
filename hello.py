@@ -8,6 +8,7 @@
        인증을 검증하는데 사용됨.
 * flash: 사용자에게 상태 업데이트를 전달하는 메시지를 구성할 수 있는 모듈
 """
+import os
 from datetime import datetime
 from flask_script import Manager
 from flask import Flask, render_template
@@ -19,6 +20,7 @@ from flask import url_for
 from flask_moment import Moment
 from flask import session
 from flask import flash
+from flask.ext.sqlalchemy import SQLAlchemy
 
 
 from flask_wtf import FlaskForm
@@ -37,6 +39,35 @@ __name__: 현재 모듈의 이름을 담고있는 내장 변수
 해당 모듈이 python 모듈명.py 와 같이 직접 실행되는 경우에만 __name__은 __main__으로 설정됨
 """
 app = Flask(__name__)
+
+"""데이터베이스 설정"""
+basedir = os.path.abspath(os.path.dirname(__file__))
+app.config['SQLALCHEMY_DATABASE_URI'] =\
+        'sqlite:///' + os.path.join(basedir, 'data.sqlite')
+app.config['SQLALCHEMY_COMMIT_ON_TEARDOWN'] = True
+db = SQLAlchemy(app)
+
+"""데이터베이스 모델 정의"""
+class Role(db.Model):
+    __tablename__ = 'roles'
+    id = db.Column(db.Integer, primary_key=True)
+    name = db.Column(db.String(64), unique=True)
+    users = db.relationship('User', backref='role') 
+
+    def __repr__(self):
+        return '<Role %r>' % self.name
+
+class User(db.Model):
+    __tablename__ = 'users'
+    id = db.Column(db.Integer, primary_key=True)
+    username = db.Column(db.String(64), unique=True, index=True)
+    role_id = db.Column(db.Integer, db.ForeignKey('roles.id')) 
+
+    def __repr__(self):
+        return '<User %r>' % self.username
+
+
+
 manager = Manager(app)
 bootstrap = Bootstrap(app)
 moment = Moment(app)
