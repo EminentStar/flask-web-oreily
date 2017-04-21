@@ -26,5 +26,10 @@ def create_app(config_name):
     from .main import main as main_blueprint # main package의 __init__.py의 main
     app.register_blueprint(main_blueprint)
 
+    # auth 블루프린트를 create_app() 팩토리에 있는 앱에 부착될 필요가 있음
+    from .auth import auth as auth_blueprint
+    app.register_blueprint(auth_blueprint, url_prefix='/auth')
+
+
     return app
 
