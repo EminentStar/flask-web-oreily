@@ -7,6 +7,7 @@ from . import main
 from .forms import NameForm
 
 
+
 @main.route('/', methods=['GET', 'POST'])
 def index():
     form = NameForm()
@@ -28,3 +29,12 @@ def index():
         form = form, name = session.get('name'),
         known = session.get('known', False),
         current_time=datetime.utcnow())
+
+
+# 인증된 사용자에게만 액세스되도록 라우트를 보호하기 위해서,
+# Flask-Login은 login_required 데코레이터를 제공함
+from flask.ext.login import login_required
+@main.route('/secret')
+@login_required
+def secret():
+    return 'Only authenticated users are allowed!'
