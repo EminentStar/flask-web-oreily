@@ -1,6 +1,10 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from . import db
 from flask_login import UserMixin
+from itsdangerous import TimedJSONWebSignatureSerializer as Serializer
+from flask import current_app
+from . import db
+
 
 # Flask-Login은 사용자와 주어진 인식자를 로드하는 콜백함수를 셋업하게 됨
 # 사용자 로더 콜백 함수는 사용자 인식자를 유니코드 문자열로 받는다.
@@ -44,7 +48,8 @@ class User(UserMixin, db.Model):
     username = db.Column(db.String(64), unique=True, index=True)
     password_hash = db.Column(db.String(128))
     role_id = db.Column(db.Integer, db.ForeignKey('roles.id')) 
-    
+    confirmed = db.Column(db.Boolean, default=False) 
+
     @property
     def password(self):
         raise AttributeError('password is not a readable attribute')
@@ -55,6 +60,23 @@ class User(UserMixin, db.Model):
     
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    def generate_confirmation_token(self, expiration=3600):
+        s = Serializer(current_app._config['SECRET_KEY'], expiration)
+        return s.dumps({'confirm': self.id})
+    
+    def confirm(self, token):
+        s = Serializer(current_app._config['SECRET_KEY'])
+        try:
+            data = s.loads(token)
+        except:
+            return False
+        if data.get('confirm') != self.id:
+            return False
+        self.confirmed = True
+        db.session.add(self)
+        return True
+
 
     def __repr__(self):
         return '<User %r>' % self.username

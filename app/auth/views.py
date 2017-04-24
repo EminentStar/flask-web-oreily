@@ -9,10 +9,8 @@ from flask_login import login_user, login_required, logout_user, \
         current_user
 from .. import db
 from ..models import User
-from .forms import LoginForm
 from ..email import send_email
-from .forms import LoginForm, RegistrationForm
-
+from .forms import LoginForm, RegistrationForm, ChangePasswordForm
 
 @auth.route('/login', methods=['GET', 'POST'])
 def login():
@@ -57,3 +55,72 @@ def register():
         return redirect(url_for('auth.login'))
 
     return render_template('auth/register.html', form=form)
+
+
+"""
+"""
+@auth.route('/confirm/<token>')
+@login_required
+def confirm(token):
+    if current_user.confirmed:
+        return redirect(url_for('main.index'))
+    if current_user.confirm(token):
+        flash('You have confirmed your account. Thanks!')
+    else:
+        flash('The confirmation link is invalid or has expired')
+    return redirect(url_for('main.index'))
+
+"""
+블루프린트로부터 before_request 후크는 블루프린트에 속한 리퀘스트에만 적용됨.
+블루프린트로부터 모든 애플리케이션 리퀘스트를 위한 후크를 설치하기 위해서는
+before_app_request 데코레이터를 사용해야함.
+
+* before_app_request 핸들러는 세 가지 조건이 참일 때 리퀘스트를 가로챔
+1. 로그인되었을 때(current_user.is_authenticated()가 True를 리턴해야함)
+2. 사용자가 확인되지 않은 계정
+3. 리퀘스트의 종단점(request.endpoint로 액세스 가능)이 인증 블루프린트의 밖에 존재할때 인증
+라우트에 대한 액세스가 허용되면 사용자는 계정을 확인하고 계정의 다른 관리 함수들을 수행할 수 있게
+된다.
+"""
+@auth.before_app_request
+def before_request():
+    if current_user.is_authenticated \
+            and not current_user.confirmed \
+            and request.endpoint[:5] != 'auth.':
+                return redirect(url_for('auth.unconfirmed'))
+
+@auth.route('/unconfirmed')
+def unconfirmed():
+    if current_user.is_anonymous or current_user.confirmed:
+        return redirect('main.index')
+    return render_template('auth/unconfirmed.html')
+
+
+"""
+이 라우트는 current_user를 사용하여 등록 라우트를 완료하는 작업을 반복한다.
+로그인한 사용자는 타깃 사용자가 된다.
+이 라우트는 또한 login_required를 사용하여 라우트를 액세스할 때 보호하도록 하며 이 리퀘스트를 만드는
+사용자는 알려져있다.
+"""
+@auth.route('/confirm')
+@login_required
+def resend_confirmation():
+    token = current_user.generate_confirmation_token()
+    send_email('auth/email/confirm',
+               'Confirm Your Account', user, token=token)
+    flash('A new confirmation email has been sent to you by email.')
+    return redirect(url_for('main.index'))
+
+@auth.route('/change-password', methods=['GET', 'POST'])
+@login_required
+def change_password():
+    form = ChangePasswordForm()
+    if form.validate_on_submit():
+        if current_user.verify_password(form.old_password.data):
+            current_user.password = form.password.data
+            db.session.add(current_user)
+            flash('Your password has been updated.')
+            return redirect(url_for('main.index'))
+        else:
+            flash('Invalid password.')
+    return render_template('auth/change_password.html', form=form)
