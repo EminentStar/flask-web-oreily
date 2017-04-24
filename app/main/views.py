@@ -33,7 +33,7 @@ def index():
 
 # 인증된 사용자에게만 액세스되도록 라우트를 보호하기 위해서,
 # Flask-Login은 login_required 데코레이터를 제공함
-from flask.ext.login import login_required
+from flask_login import login_required
 @main.route('/secret')
 @login_required
 def secret():

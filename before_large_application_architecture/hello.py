@@ -20,23 +20,23 @@ from flask import url_for
 from flask_moment import Moment
 from flask import session
 from flask import flash
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_sqlalchemy import SQLAlchemy
 from flask_wtf import FlaskForm
 from wtforms import StringField, SubmitField 
 from wtforms.validators import Required
 
 # 쉘 세션이 시작될 때마다 디비 인스턴스 및 모델을 임포트하는 반복을 피하기 위해 사용. 
 # 특정 오브젝트를 자동으로 임포트하기 위해 설정. make_context 콜백 함수를 이용하여 등록해야함.
-from flask.ext.script import Shell
+from flask_script import Shell
 
 # Flask- Migrate 설정
-from flask.ext.migrate import Migrate, MigrateCommand
+from flask_migrate import Migrate, MigrateCommand
 
 # Flask-Mail 초기화
-from flask.ext.mail import Mail
+from flask_mail import Mail
 
 # 이메일 지원
-from flask.ext.mail import Message
+from flask_mail import Message
 
 # 이메일 비동기 처리를 위한 Thread
 from threading import Thread

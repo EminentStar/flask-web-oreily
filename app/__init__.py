@@ -1,8 +1,8 @@
 from flask import Flask, render_template
-from flask.ext.bootstrap import Bootstrap
-from flask.ext.mail import Mail
-from flask.ext.moment import Moment
-from flask.ext.sqlalchemy import SQLAlchemy
+from flask_bootstrap import Bootstrap
+from flask_mail import Mail
+from flask_moment import Moment
+from flask_sqlalchemy import SQLAlchemy
 from config import config
 
 
@@ -12,7 +12,7 @@ moment = Moment()
 db = SQLAlchemy()
 
 # Flask-Login을 애플리케이션 팩토리 함수에서 초기화 가능
-from flask.ext.login import LoginManager
+from flask_login import LoginManager
 
 login_manager = LoginManager()
 # LoginManager 오브젝트의 session_protection속성은 None, 'basic', 혹은 'string'으로 설정가능하다.

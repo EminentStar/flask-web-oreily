@@ -1,6 +1,6 @@
 from werkzeug.security import generate_password_hash, check_password_hash
 from . import db
-from flask.ext.login import UserMixin
+from flask_login import UserMixin
 
 # Flask-Login은 사용자와 주어진 인식자를 로드하는 콜백함수를 셋업하게 됨
 # 사용자 로더 콜백 함수는 사용자 인식자를 유니코드 문자열로 받는다.
