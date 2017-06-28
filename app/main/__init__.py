@@ -10,3 +10,10 @@ from flask import Blueprint
 main = Blueprint('main', __name__)
 
 from . import views, errors
+from app.models import Permission
+
+
+# 템플릿 컨텍스트에 Permission 클래스 추가
+@main.app_context_processor
+def inject_permissions():
+    return dict(Permission=Permission)

@@ -92,7 +92,5 @@ ENV/
 
 
 #
-run.sh
-
 data.sqlite
 migrations
