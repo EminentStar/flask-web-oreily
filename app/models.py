@@ -5,6 +5,8 @@ from flask import current_app
 from datetime import datetime
 from flask import request
 import hashlib
+from markdown import markdown
+import bleach
 
 
 from . import db
@@ -18,6 +20,19 @@ from . import login_manager
 @login_manager.user_loader
 def load_user(user_id):
     return User.query.get(int(user_id))
+
+
+class Follow(db.Model):
+    """
+        관계에서 커스텀 데이터를 사용하기 위해서 관련 테이블이 애플리케이션에서 액세스될 수 있도록
+        적절한 모델이 되어야 함.
+    """
+    __tablename__ = 'follows'
+    follower_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+                            primary_key=True)
+    followed_id = db.Column(db.Integer, db.ForeignKey('users.id'),
+                            primary_key=True)
+    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
 
 
 """데이터베이스 모델 정의"""
@@ -81,6 +96,46 @@ class User(UserMixin, db.Model):
     member_since = db.Column(db.DateTime(), default=datetime.utcnow)
     last_seen = db.Column(db.DateTime(), default=datetime.utcnow)
     avatar_hash = db.Column(db.String(32))
+    """
+        lazy='dynamic' 모드는관계 속성은 직접 아이템을 리턴하지 않고 쿼리 오브젝트를 리턴한다. 또한
+        추가적인 필터가 실행되기 전에 쿼리가 추가됨.
+    """
+    posts = db.relationship('Post', backref='author', lazy='dynamic')
+    """
+        관계는 일대다 관계를 위해사용된 동일한 db.relationship() 생성으로 정의됨
+        그러나 다대다 관계인 경우 추가적으로 secondary 인수가 관련 테이블을 설정해줘야함.
+        관계는 두 개의 클래스 각각을 정의하며 backref 인수를 사용하여 다른 쪽의 관계를 연결해 준다.
+        다다다의 경우 association table을 추가하면 됨. 이는 테이블로 정의되지만 모델은 아님.
+        SQLAlchemy가 이 테이블을 내부적으로 관리함.
+    """
+    """
+        followed, followers는 각각 일대다 관계로 정의되었음.
+        역참조를 위한 lazy 인수는 joined로 설정됨. 
+        이 lazy mode는 관련된 오브젝트가 조인 쿼리로부터 즉시 로드되도록 한다.
+        lazy의기본값은 select인데, user.followed.all()을 호출하면 100개의 Follow 인스턴스를 리턴하게
+        되며 각각은 followers와 followed 역참조 속석을 각자의 사용자로 설정하도록 한다. 이때 팔로워한 사용자의 완전한 리스트를 얻는다는 것은 100개의 추가적인 데이터베이스
+        쿼리를 원한다는 것을 의미함. 
+        하지만 lazy='joined'는 user.followed.all()을 호출할때 하나의 데이터베이스 쿼리에서
+        발생하도록 한다.
+        cascade 인수는 부모 오브젝트에서 수행된 액션이 관련되어 있는 오브젝트에 어떻게 전파하는지를
+        설정한다. 이 옵션의 예는 오브젝트가 디비 세션에 추가될 때 적용되는 규칙이며 관련된 관례를
+        통해서 어떤 오브젝트라도 자동으로 세션에 추가되어야 한다. 디폴트 cascade 옵션은 대부분의
+        상황에서 적합하지만, 다대다 관계의 경우 적합하지 않다.
+        오브젝트가 삭제될 때 default cascade 옵션의 행동은 null 값으로 링크되어 있는 관련된
+        오브젝트에서 외래키를 설정하는 것이다. 그러나 관련 테이블의 경우 올바른 행동은 삭제할
+        레코드를 가리키는 엔트리를 삭제하는 것이며 이것은 링크를 효과적으로 없애게 된다. 이와 같은
+        작업은 delete-orphan cascade 옵션이 하는 작업이다.
+    """
+    followed = db.relationship('Follow',
+                                foreign_keys=[Follow.follower_id],
+                                backref=db.backref('follower', lazy='joined'),
+                                lazy='dynamic',
+                                cascade='all, delete-orphan')
+    followers = db.relationship('Follow',
+                                foreign_keys=[Follow.followed_id],
+                                backref=db.backref('followed', lazy='joined'),
+                                lazy='dynamic',
+                                cascade='all, delete-orphan')
     
     def __init__(self, **kwargs):
         super(User,self).__init__(**kwargs)
@@ -91,7 +146,8 @@ class User(UserMixin, db.Model):
                 self.role = Role.query.filter_by(default=True).first()
         if self.email is not None and self.avatar_hash is None:
             self.avatar_hash = hashlib.md5(
-                    self.email.encode('utf-8')).hexdigest()
+                self.email.encode('utf-8')).hexdigest()
+        self.followed.append(Follow(followed=self))
 
     @property
     def password(self):
@@ -182,6 +238,73 @@ class User(UserMixin, db.Model):
         return '{url}/{hash}?s={size}&d={default}&r={rating}'.format(
             url=url, hash=hash, size=size, default=default, rating=rating)
 
+    @staticmethod
+    def generate_fake(count=100):
+        from sqlalchemy.exc import IntegrityError
+        from random import seed
+        import forgery_py
+
+        seed()
+        for i in range(count):
+            u = User(email=forgery_py.internet.email_address(),
+                    username=forgery_py.internet.user_name(True),
+                    password=forgery_py.lorem_ipsum.word(),
+                    confirmed=True,
+                    name=forgery_py.name.full_name(),
+                    location=forgery_py.address.city(),
+                    about_me=forgery_py.lorem_ipsum.sentence(),
+                    member_since=forgery_py.date.date(True))
+            db.session.add(u)
+            try:
+                db.session.commit()
+            except IntegrityError:
+                db.session.rollback()
+    
+    @staticmethod
+    def add_self_follows():
+        """
+            이렇게 데이터베이스에 업데이트하도록 하는 함수를 생성하는 것은 애플리케이션을 배포할 때
+            애플리케이션을 업데이트하려고 사용되는 일반적인 기술임.
+            ```
+                $ python manage.py shell
+                >> User.add_self_follows()
+            ```
+        """
+        for user in User.query.all():
+            if not user.is_following(user):
+                user.follow(user)
+                db.session.add(user)
+                db.session.commit()
+
+    def follow(self, user):
+        if not self.is_following(user):
+            f = Follow(follower=self, followed=user)
+            db.session.add(f)
+
+
+    def unfollow(self, user):
+        f = self.followed.filter_by(followed_id=user.id).first()
+        if f:
+            db.session.delete(f)
+
+    def is_following(self, user):
+        return self.followed.filter_by(
+                followed_id=user.id).first() is not None
+
+    def is_followed_by(self, user):
+        return self.followers.filter_by(
+                follower_id=user.id).first() is not None
+
+    @property
+    def followed_posts(self):
+        """
+            이 메소드는 property로 정의되기에 ()가 필요없다.
+        """
+        """
+            해당 유저가 following한 사용자가 작성한 블로그 포스트의 리스트
+        """
+        return Post.query.join(Follow, Follow.followed_id == Post.author_id)\
+                .filter(Follow.follower_id == self.id)
 
     def __repr__(self):
         return '<User %r>' % self.username
@@ -194,11 +317,60 @@ class AnonymousUser(AnonymousUserMixin):
     def is_administrator(self):
         return False
 
+
 class Permission:
     FOLLOW = 0x01
     COMMENT = 0x02
     WRITE_ARTICLES = 0x04
     MODERATE_COMMENTS = 0x08
     ADMINISTER = 0x80
+
+
+class Post(db.Model):
+    __tablename__ = 'posts'
+    id = db.Column(db.Integer, primary_key=True)
+    body = db.Column(db.Text)
+    body_html = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+
+    @staticmethod
+    def generate_fake(count=100):
+        from random import seed, randint
+        import forgery_py
+
+        seed()
+        user_count = User.query.count()
+        for i in range(count):
+            u = User.query.offset(randint(0, user_count - 1)).first()
+            p = Post(body=forgery_py.lorem_ipsum.sentences(randint(1, 3)),
+                    timestamp=forgery_py.date.date(True),
+                    author=u)
+            db.session.add(p)
+            db.session.commit()
+
+    @staticmethod
+    def on_changed_body(target, value, oldvalue, intiator):
+        allowed_tags = ['a', 'abbr', 'acronym', 'b', 'blockquote', 'code', 
+                        'em', 'i', 'li', 'ol', 'pre', 'strong', 'ul',
+                        'h1', 'h2', 'h3', 'p']
+        target.body_html = bleach.linkify(bleach.clean(
+            markdown(value, output_format='html'),
+            tags=allowed_tags, strip=True))
+
+
+
+"""
+on_changed_body 함수는 보디(body)의 SQLAlchemy의 'set' 이벤트의 listener로 등록됨.
+이는 클래스의 어떤 인스턴스에서도 body 필드가 새로운 값으로 설정되면 자동으로 호출된다는 의미. 이
+함수는 body의 html 버전을 렌더링하고 마크다운 텍스트를 HTML의 자동 변환을 효과적으로 하는
+body_html에 저장하게 됨.
+
+## 실제 변환작업
+1. markdown()이 HTML로 촉기 변환 작업을 함. 그 결과 승인된 HTML 태그의 리스트와 함께 clean에 전달됨
+2. clean()은 white list에 없는 태그를 삭제함.
+3. 마지막 변환 작업은 bleach의 linkify()를 사용해서 이뤄짐.
+"""
+db.event.listen(Post.body, 'set', Post.on_changed_body)
 
 login_manager.anonymous_user = AnonymousUser

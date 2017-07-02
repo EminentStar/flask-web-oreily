@@ -3,6 +3,7 @@ from flask_bootstrap import Bootstrap
 from flask_mail import Mail
 from flask_moment import Moment
 from flask_sqlalchemy import SQLAlchemy
+from flask_pagedown import PageDown
 from config import config
 
 
@@ -10,6 +11,7 @@ bootstrap = Bootstrap()
 mail = Mail()
 moment = Moment()
 db = SQLAlchemy()
+pagedown = PageDown()
 
 # Flask-Login을 애플리케이션 팩토리 함수에서 초기화 가능
 from flask_login import LoginManager
@@ -36,6 +38,7 @@ def create_app(config_name):
     db.init_app(app)
 
     login_manager.init_app(app)
+    pagedown.init_app(app)
 
     # 여기에 라우트와 커스텀 에러 페이지를 추가한다.
     from .main import main as main_blueprint # main package의 __init__.py의 main
@@ -44,7 +47,6 @@ def create_app(config_name):
     # auth 블루프린트를 create_app() 팩토리에 있는 앱에 부착될 필요가 있음
     from .auth import auth as auth_blueprint
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
-
 
     return app
 
