@@ -43,7 +43,8 @@ $ python manage.py shell
 - markdown: 서버측 markdown-to-HTML 변환기
 - bleach: HTML sanitizer
 - flask-httpauth: HTTP 인증을 위한 래퍼
-
+- httpie: http 클라이언트
+- coverage: 코드 커버리지 툴
 
 
 ### HTTPie Usage
