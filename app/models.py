@@ -22,6 +22,27 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 
+class Comment(db.Model):
+    __tablename__ = 'comments'
+    id = db.Column(db.Integer, primary_key=True)
+    body = db.Column(db.Text)
+    body_html = db.Column(db.Text)
+    timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
+    disabled = db.Column(db.Boolean) # 적절하지 않은 코멘트를 관리하기 위함.
+    author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id'))
+
+    @staticmethod
+    def on_changed_body(target, value, oldvalue, initiator):
+        allowed_tags = ['a', 'abbr', 'acronym', 'b', 'code', 'em', 'i',
+                        'strong']
+        target_body_html = bleach.linkify(bleach.clean(
+            markdown(value, output_format='html'),
+            tags=allowed_tags, strip=True))
+
+db.event.listen(Comment.body, 'set', Comment.on_changed_body)
+
+
 class Follow(db.Model):
     """
         관계에서 커스텀 데이터를 사용하기 위해서 관련 테이블이 애플리케이션에서 액세스될 수 있도록
@@ -136,6 +157,8 @@ class User(UserMixin, db.Model):
                                 backref=db.backref('followed', lazy='joined'),
                                 lazy='dynamic',
                                 cascade='all, delete-orphan')
+    # comments 테이블을 사용하여 일대다 관계 정의
+    comments = db.relationship('Comment', backref='author', lazy='dynamic')
     
     def __init__(self, **kwargs):
         super(User,self).__init__(**kwargs)
@@ -333,6 +356,8 @@ class Post(db.Model):
     body_html = db.Column(db.Text)
     timestamp = db.Column(db.DateTime, index=True, default=datetime.utcnow)
     author_id = db.Column(db.Integer, db.ForeignKey('users.id'))
+    # comments 테이블을 사용하여 일대다 관계 정의
+    comments = db.relationship('Comment', backref='post', lazy='dynamic')
 
     @staticmethod
     def generate_fake(count=100):
@@ -358,8 +383,6 @@ class Post(db.Model):
             markdown(value, output_format='html'),
             tags=allowed_tags, strip=True))
 
-
-
 """
 on_changed_body 함수는 보디(body)의 SQLAlchemy의 'set' 이벤트의 listener로 등록됨.
 이는 클래스의 어떤 인스턴스에서도 body 필드가 새로운 값으로 설정되면 자동으로 호출된다는 의미. 이
@@ -374,3 +397,5 @@ body_html에 저장하게 됨.
 db.event.listen(Post.body, 'set', Post.on_changed_body)
 
 login_manager.anonymous_user = AnonymousUser
+
+
