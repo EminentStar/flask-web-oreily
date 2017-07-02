@@ -4,6 +4,7 @@ from flask import render_template, session, redirect, url_for, current_app, flas
 # Flask-Login을 이용하면 사용자 세션에 로그인 데이터를 저장하며
 #플라스크는 기본적으로 클라이언트 측 쿠키에 저장한다.
 from flask_login import current_user 
+from flask_sqlalchemy import get_debug_queries
 
 
 from .. import db
@@ -13,6 +14,24 @@ from . import main
 from .forms import NameForm, EditProfileForm, EditProfileAdminForm,\
         PostForm, CommentForm
 from app.decorators import admin_required, permission_required
+
+
+"""
+## after_app_request
+before_app_request와 비슷한 방법으로 동작.
+리퀘스트가 리턴하도록 처리하는 뷰 함수 이후에 호출됨.
+플라스크는 수정될 필요가 있는 경우에 응답 오브젝트를 after_app_request 핸들러에 전달한다.
+"""
+@main.after_app_request
+def after_request(response):
+    for query in get_debug_queries():
+        if query.duration >= current_app.config['FLASKY_SLOW_DB_QUERY_TIME']:
+            current_app.logger.warning(
+                'Slow query: %s\nParameters: %s\nDuration: %fs\nContext: %s\n'
+                % (query.statement, query.parameters, query.duration,
+                   query.context))
+    return response
+
 
 """
 @main.route('/', methods=['GET', 'POST'])
