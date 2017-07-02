@@ -47,6 +47,13 @@ def create_app(config_name):
     # auth 블루프린트를 create_app() 팩토리에 있는 앱에 부착될 필요가 있음
     from .auth import auth as auth_blueprint
     app.register_blueprint(auth_blueprint, url_prefix='/auth')
+    
 
+    """
+        API Blueprint 등록
+    """
+    from .api_1_0 import api as api_1_0_blueprint
+    app.register_blueprint(api_1_0_blueprint, url_prefix='/api/v1.0')
+    
     return app
 

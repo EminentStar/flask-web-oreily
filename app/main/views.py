@@ -1,7 +1,10 @@
 from datetime import datetime
 from flask import render_template, session, redirect, url_for, current_app, flash, request, \
         current_app, make_response
-from flask_login import current_user
+# Flask-Login을 이용하면 사용자 세션에 로그인 데이터를 저장하며
+#플라스크는 기본적으로 클라이언트 측 쿠키에 저장한다.
+from flask_login import current_user 
+
 
 from .. import db
 from ..models import User, Permission, Post, Comment
